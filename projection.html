@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  overflow:hidden;
+  background:black;
+}
+
+canvas{
+  display:block;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="projection"></canvas>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+
+// CONFIG FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyDU0ZfDugkQfm5DDNmAg7H_B1BuAc6aXzs",
+  authDomain: "fleurs-44164.firebaseapp.com",
+  projectId: "fleurs-44164",
+  storageBucket: "fleurs-44164.firebasestorage.app",
+  messagingSenderId: "720571774567",
+  appId: "1:720571774567:web:50a1bac10d685dbf1bc6c2",
+  measurementId: "G-7LDHQNFFRZ"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+
+// canvas projection
+const canvas = document.getElementById("projection");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+
+// tableau fleurs
+let flowers = [];
+
+// écouter firebase
+db.collection("flowers")
+.orderBy("time")
+.onSnapshot(snapshot => {
+
+  snapshot.docChanges().forEach(change => {
+
+    if(change.type === "added"){
+
+      const data = change.doc.data();
+
+      const img = new Image();
+
+      img.onload = () => {
+
+        flowers.push({
+          img: img,
+          x: Math.random() * (canvas.width - 200),
+          y: Math.random() * (canvas.height - 200),
+          size: 120 + Math.random()*80,
+          angle: Math.random()*360,
+          speed: 0.2
+        });
+
+      };
+
+      img.src = data.image;
+
+    }
+
+  });
+
+});
+
+
+// animation
+function animate(){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  flowers.forEach(f => {
+
+    ctx.save();
+
+    ctx.translate(f.x,f.y);
+    ctx.rotate(f.angle*Math.PI/180);
+
+    ctx.drawImage(
+      f.img,
+      -f.size/2,
+      -f.size/2,
+      f.size,
+      f.size
+    );
+
+    ctx.restore();
+
+    f.angle += f.speed;
+
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+
+// resize écran
+window.addEventListener("resize", () => {
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+});
+
+// ---------------- RESET AVEC 000 ----------------
+
+let keyBuffer = "";
+
+document.addEventListener("keydown", (e) => {
+
+  // garder seulement les chiffres
+  if (e.key >= "0" && e.key <= "9") {
+    keyBuffer += e.key;
+  } else {
+    keyBuffer = "";
+  }
+
+  // garder seulement les 3 derniers caractères
+  if (keyBuffer.length > 3) {
+    keyBuffer = keyBuffer.slice(-3);
+  }
+
+  // si 000 est tapé
+  if (keyBuffer === "000") {
+
+    console.log("RESET PROJECTION");
+
+    // vider l'écran
+    flowers = [];
+
+    // nettoyer le canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // si Firestore utilisé
+    if (unsubscribe) {
+      unsubscribe();
+    }
+
+    unsubscribe = db.collection("flowers")
+      .orderBy("time")
+      .onSnapshot(snapshot => {
+
+        flowers = [];
+
+        snapshot.forEach(doc => {
+
+          const data = doc.data();
+
+          const img = new Image();
+          img.src = data.image;
+
+          img.onload = () => {
+
+            flowers.push({
+              img: img,
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              size: 150
+            });
+
+          };
+
+        });
+
+      });
+
+    keyBuffer = "";
+  }
+
+});
+
+</script>
+
+</body>
+</html>

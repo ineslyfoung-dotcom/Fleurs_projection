@@ -1,0 +1,346 @@
+<!DOCTYPE html> 
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  text-align: center;
+  font-family: sans-serif;
+}
+
+#canvasContainer {
+  position: relative;
+  margin: auto;
+}
+
+canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  touch-action: none;
+}
+
+#drawCanvas {
+  z-index: 1;
+  background: white;
+}
+
+#lineCanvas {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none;
+}
+
+/* notification */
+#notif {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: black;
+  color: white;
+  padding: 15px 25px;
+  border-radius: 20px;
+  opacity: 0;
+  transition: 0.3s;
+  z-index: 9999;
+}
+
+#notif.show {
+  opacity: 1;
+}
+</style>
+</head>
+
+<body>
+
+<!-- SELECTION -->
+<div id="screen-selection">
+  <h2>Choisis ta fleur 🌸</h2>
+  <img src="1.png" onclick="selectFlower('1.png')" width="120">
+  <img src="5.png" onclick="selectFlower('5.png')" width="120">
+  <img src="6.png" onclick="selectFlower('6.png')" width="120">
+  <img src="7.png" onclick="selectFlower('7.png')" width="120">
+  <img src="8.png" onclick="selectFlower('8.png')" width="120">
+  <img src="16.png" onclick="selectFlower('16.png')" width="120">
+  <img src="14.png" onclick="selectFlower('14.png')" width="120">
+  <img src="4.png" onclick="selectFlower('4.png')" width="120">
+  <img src="10.png" onclick="selectFlower('10.png')" width="120">
+  <img src="17.png" onclick="selectFlower('17.png')" width="120">
+
+</div>
+
+<!-- DRAW -->
+<div id="screen-drawing" class="hidden">
+  <h2>Colorie 🎨</h2>
+
+  <div id="canvasContainer">
+    <canvas id="drawCanvas"></canvas>
+    <canvas id="lineCanvas"></canvas>
+  </div>
+
+  <br>
+
+  <input type="color" id="colorPicker" value="#ff0000">
+  <input type="range" id="brushSize" min="1" max="30" value="10">
+
+  <br><br>
+
+  <button onclick="clearCanvas()">Effacer</button>
+  <button onclick="goBack()">Retour</button>
+  <button onclick="sendDrawing()">Envoyer</button>
+</div>
+
+<!-- NOTIF -->
+<div id="notif">🌸 Fleur envoyée !</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+
+// FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyDU0ZfDugkQfm5DDNmAg7H_B1BuAc6aXzs",
+  authDomain: "fleurs-44164.firebaseapp.com",
+  projectId: "fleurs-44164",
+  storageBucket: "fleurs-44164.firebasestorage.app",
+  messagingSenderId: "720571774567",
+  appId: "1:720571774567:web:50a1bac10d685dbf1bc6c2",
+  measurementId: "G-7LDHQNFFRZ"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// CANVAS
+const drawCanvas = document.getElementById("drawCanvas");
+const drawCtx = drawCanvas.getContext("2d");
+
+const lineCanvas = document.getElementById("lineCanvas");
+const lineCtx = lineCanvas.getContext("2d");
+
+let img = new Image();
+let drawing = false;
+let color = "#ff0000";
+let brushSize = 10;
+
+// UI
+document.getElementById("colorPicker").oninput = e => color = e.target.value;
+document.getElementById("brushSize").oninput = e => brushSize = e.target.value;
+
+// SELECT
+function selectFlower(src) {
+  document.getElementById("screen-selection").classList.add("hidden");
+  document.getElementById("screen-drawing").classList.remove("hidden");
+  loadFlower(src);
+}
+
+// BACK
+function goBack() {
+  document.getElementById("screen-drawing").classList.add("hidden");
+  document.getElementById("screen-selection").classList.remove("hidden");
+}
+
+// LOAD FLOWER
+function loadFlower(src) {
+
+  img = new Image();
+
+  img.onload = () => {
+
+    drawCanvas.width = img.width;
+    drawCanvas.height = img.height;
+
+    lineCanvas.width = img.width;
+    lineCanvas.height = img.height;
+
+    const container = document.getElementById("canvasContainer");
+    container.style.width = img.width + "px";
+    container.style.height = img.height + "px";
+
+    // fond blanc pour dessiner
+    drawCtx.fillStyle = "white";
+    drawCtx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+
+    // contours
+    lineCtx.clearRect(0,0,img.width,img.height);
+    lineCtx.drawImage(img,0,0);
+  }
+
+  img.src = src;
+}
+
+// DRAW
+function start(e){
+  drawing = true;
+  draw(e);
+}
+
+function stop(){
+  drawing = false;
+  drawCtx.beginPath();
+}
+
+function draw(e){
+
+  if(!drawing) return;
+
+  const rect = drawCanvas.getBoundingClientRect();
+
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+  drawCtx.lineWidth = brushSize;
+  drawCtx.lineCap = "round";
+  drawCtx.strokeStyle = color;
+
+  drawCtx.lineTo(x,y);
+  drawCtx.stroke();
+
+  drawCtx.beginPath();
+  drawCtx.moveTo(x,y);
+}
+
+// EVENTS
+drawCanvas.addEventListener("mousedown", start);
+drawCanvas.addEventListener("mouseup", stop);
+drawCanvas.addEventListener("mousemove", draw);
+
+drawCanvas.addEventListener("touchstart", start);
+drawCanvas.addEventListener("touchend", stop);
+drawCanvas.addEventListener("touchmove", draw);
+
+// CLEAR
+function clearCanvas() {
+  drawCtx.fillStyle = "white";
+  drawCtx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+}
+
+// NOTIF
+function showNotif() {
+
+  const notif = document.getElementById("notif");
+
+  notif.classList.add("show");
+
+  setTimeout(() => {
+    notif.classList.remove("show");
+  }, 2000);
+}
+
+// SEND DRAWING (MODIFICATION ICI)
+function sendDrawing() {
+
+  const finalCanvas = document.createElement("canvas");
+  const finalCtx = finalCanvas.getContext("2d");
+
+  finalCanvas.width = drawCanvas.width;
+  finalCanvas.height = drawCanvas.height;
+
+  // fusion dessin + fleur
+  finalCtx.drawImage(drawCanvas, 0, 0);
+  finalCtx.drawImage(lineCanvas, 0, 0);
+
+  const imageData = finalCtx.getImageData(
+    0,
+    0,
+    finalCanvas.width,
+    finalCanvas.height
+  );
+
+  const data = imageData.data;
+  const w = finalCanvas.width;
+  const h = finalCanvas.height;
+
+  // tableau des pixels visités
+  const visited = new Uint8Array(w * h);
+  const stack = [];
+
+  function isWhite(r, g, b) {
+    return r > 240 && g > 240 && b > 240;
+  }
+
+  function push(x, y) {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+
+    const index = y * w + x;
+
+    if (visited[index]) return;
+
+    const i = index * 4;
+
+    if (!isWhite(data[i], data[i+1], data[i+2])) return;
+
+    visited[index] = 1;
+    stack.push({x, y});
+  }
+
+  // départ depuis les bords
+  for (let x = 0; x < w; x++) {
+    push(x, 0);
+    push(x, h - 1);
+  }
+
+  for (let y = 0; y < h; y++) {
+    push(0, y);
+    push(w - 1, y);
+  }
+
+  // flood fill
+  while (stack.length > 0) {
+
+    const {x, y} = stack.pop();
+    const index = y * w + x;
+    const i = index * 4;
+
+    // rendre transparent
+    data[i+3] = 0;
+
+    push(x+1, y);
+    push(x-1, y);
+    push(x, y+1);
+    push(x, y-1);
+  }
+
+  finalCtx.putImageData(imageData, 0, 0);
+
+  const finalImage = finalCanvas.toDataURL("image/png");
+
+  db.collection("flowers").add({
+    image: finalImage,
+    time: Date.now()
+  })
+  .then(() => {
+    showNotif();
+  })
+  .catch((e) => {
+    console.error(e);
+    alert("Erreur Firestore");
+  });
+}
+
+  // remettre l'image modifiée
+  finalCtx.putImageData(imageData, 0, 0);
+
+  // 🔴 AJOUT ICI
+  finalCtx.globalCompositeOperation = "destination-in";
+  finalCtx.drawImage(lineCanvas, 0, 0);
+
+  finalCtx.globalCompositeOperation = "source-over";
+  finalCtx.drawImage(lineCanvas, 0, 0);
+  // 🔴 FIN AJOUT
+
+  const finalImage = finalCanvas.toDataURL("image/png");
+
+</script>
+
+</body>
+</html>
