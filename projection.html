@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+}
+
+canvas {
+  display: block;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="projection"></canvas>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+
+// CONFIG FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyCAkb59t1HJ577vyAQtW25mUbIV6kGoT7g",
+  authDomain: "projet-fleurs-projection.firebaseapp.com",
+  projectId: "projet-fleurs-projection",
+  storageBucket: "projet-fleurs-projection.firebasestorage.app",
+  messagingSenderId: "627785293231",
+  appId: "1:627785293231:web:3b7ba5435910f862f7635a"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// CANVAS
+const canvas = document.getElementById("projection");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// TABLEAU FLEURS
+let flowers = [];
+
+// FONCTION pour créer un objet fleur avec toutes les propriétés
+function createFlower(img) {
+  return {
+    img: img,
+    x: Math.random() * (canvas.width - 200) + 100,
+    y: Math.random() * (canvas.height - 200) + 100,
+    size: 120 + Math.random() * 80,
+    visible: true
+  };
+}
+
+// ÉCOUTER FIREBASE — stocké dans unsubscribe dès le départ
+let unsubscribe = db.collection("flowers")
+  .orderBy("time")
+  .onSnapshot(snapshot => {
+
+    snapshot.docChanges().forEach(change => {
+
+      if (change.type === "added") {
+
+        const data = change.doc.data();
+        const img = new Image();
+
+        img.onload = () => {
+          flowers.push(createFlower(img));
+        };
+
+        img.src = data.image;
+      }
+
+    });
+
+  });
+
+
+// ANIMATION
+function animate() {
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  flowers.forEach(f => {
+  if (!f.visible) return;
+
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.drawImage(f.img, -f.size / 2, -f.size / 2, f.size, f.size);
+  ctx.restore();
+});
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+
+// RESIZE — repositionne les fleurs proportionnellement
+window.addEventListener("resize", () => {
+
+  const ratioX = window.innerWidth / canvas.width;
+  const ratioY = window.innerHeight / canvas.height;
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  flowers.forEach(f => {
+    f.x *= ratioX;
+    f.y *= ratioY;
+  });
+
+});
+
+
+// RESET AVEC 000
+let keyBuffer = "";
+
+document.addEventListener("keydown", (e) => {
+
+  if (e.key >= "0" && e.key <= "9") {
+    keyBuffer += e.key;
+  } else {
+    keyBuffer = "";
+  }
+
+  if (keyBuffer.length > 3) {
+    keyBuffer = keyBuffer.slice(-3);
+  }
+
+  if (keyBuffer === "000") {
+  flowers.forEach(f => f.visible = false);
+  keyBuffer = "";
+}
+
+    // Nouveau listener — recharge tout depuis Firestore
+    unsubscribe = db.collection("flowers")
+      .orderBy("time")
+      .onSnapshot(snapshot => {
+
+        snapshot.docChanges().forEach(change => {
+
+          if (change.type === "added") {
+
+            const data = change.doc.data();
+            const img = new Image();
+
+            img.onload = () => {
+              flowers.push(createFlower(img));
+            };
+
+            img.src = data.image;
+          }
+
+        });
+
+      });
+
+    keyBuffer = "";
+  }
+
+);
+
+</script>
+
+</body>
+</html>
